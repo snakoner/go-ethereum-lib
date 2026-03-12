@@ -6,10 +6,19 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/google/uuid"
 	ethlib "github.com/snakoner/go-ethereum-lib"
+)
+
+const (
+	sepoliaRPCURL           = "https://eth-sepolia.g.alchemy.com/v2/"
+	sepoliaMulticallAddress = "0xcA11bde05977b3631167028862bE2a173976CA11"
+)
+
+var (
+	sepoliaChainID = big.NewInt(11155111)
 )
 
 func UUIDToBytes32(id uuid.UUID) [32]byte {
@@ -19,83 +28,115 @@ func UUIDToBytes32(id uuid.UUID) [32]byte {
 }
 
 func main() {
-	contractAddress := "0x4710fCb1e83bd593f734A6a4910A66DF3d940c5C"
-	fromPrivateKey := "e230e23c4cd059377fa1d4cea5e83ed95acdf2faa49cca063a59326067199425"
+	// contractAddress := "0x4710fCb1e83bd593f734A6a4910A66DF3d940c5C"
+	// fromPrivateKey := "e230e23c4cd059377fa1d4cea5e83ed95acdf2faa49cca063a59326067199425"
 	tokenAddress := "0xC55d61E9c41432eE19Ca0a823A82F1ef15998E58"
-	client := ethlib.NewClient("https://eth-sepolia.g.alchemy.com/v2/<>", big.NewInt(11155111), false, "0xcA11bde05977b3631167028862bE2a173976CA11")
+	client := ethlib.NewClient(
+		sepoliaRPCURL,
+		sepoliaChainID,
+		true,
+		sepoliaMulticallAddress,
+	)
 
-	balances, err := client.BalanceOfMulticall(context.Background(), tokenAddress, []string{
-		"0x455E5AA18469bC6ccEF49594645666C587A3a71B",
-		"0x4710fCb1e83bd593f734A6a4910A66DF3d940c5C",
-		"0xcA11bde05977b3631167028862bE2a173976CA11",
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(len(balances), balances)
-
-	balance, err := client.BalanceAt(context.Background(), "0x2cafae9981772c54167c9944f3c2869c30d70c91")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	balanceOf, err := client.BalanceOf(context.Background(), tokenAddress, "0x455E5AA18469bC6ccEF49594645666C587A3a71B")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	txHash, err := client.TransferToken(
+	balancesOf, err := client.BalanceOfMulticall(
 		context.Background(),
 		tokenAddress,
-		"0x455E5AA18469bC6ccEF49594645666C587A3a71B",
-		big.NewInt(1000000),
-		fromPrivateKey,
+		[]string{
+			"0x455E5AA18469bC6ccEF49594645666C587A3a71B",
+			"0x455E5AA18469bC6ccEF49594645666C587A3a71B",
+			"0x455E5AA18469bC6ccEF49594645666C587A3a71B",
+			"0x455E5AA18469bC6ccEF49594645666C587A3a71B",
+		},
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = client.WaitForStatusSuccess(context.Background(), txHash, 30*time.Second)
+	fmt.Println(balancesOf)
+
+	/*
+		txHash, err := client.TransferToken(
+			context.Background(),
+			tokenAddress,
+			"0x455E5AA18469bC6ccEF49594645666C587A3a71B",
+			big.NewInt(1000000),
+			fromPrivateKey,
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Println(txHash)
+	*/
+
+	/*
+		txHash, err := TransferTokensWithNative(
+			client,
+			fromPrivateKey,
+			contractAddress,
+			UUIDToBytes32(uuid.New()),
+			"0x455E5AA18469bC6ccEF49594645666C587A3a71B",
+			big.NewInt(1000000),
+			big.NewInt(1000000),
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = client.WaitForStatusSuccess(context.Background(), txHash, 30*time.Second)
+		if err != nil {
+			log.Fatal(err)
+		}
+	*/
+}
+
+func TransferTokensWithNative(
+	client *ethlib.Client,
+	fromPrivateKey string,
+	contractAddress string,
+	transactionID [32]byte,
+	toAddress string,
+	tokenAmount *big.Int,
+	nativeAmount *big.Int,
+) (string, error) {
+	fromAddressPrivKey, err := crypto.HexToECDSA(fromPrivateKey)
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
 
-	uuid := uuid.New()
-	bytes32 := UUIDToBytes32(uuid)
+	fromAddress := crypto.PubkeyToAddress(fromAddressPrivKey.PublicKey)
+
 	callData, err := ethlib.BuildETHFunctionData(
 		"transferTokensWithNative(bytes32,address,uint256,uint256)",
-		bytes32,
-		"0x2cafae9981772c54167c9944f3c2869c30d70c91",
-		big.NewInt(1000000),
-		big.NewInt(1000000),
+		transactionID,
+		toAddress,
+		tokenAmount,
+		nativeAmount,
 	)
 	if err != nil {
-		log.Fatal("BuildETHFunctionData error: ", err)
+		return "", err
 	}
 
-	fmt.Println("callData: ", callData)
+	callObj := map[string]interface{}{
+		"from": fromAddress.Hex(),
+		"to":   contractAddress,
+		"data": callData,
+	}
 
-	signedTx, err := client.SignTx(context.Background(), callData, contractAddress, fromPrivateKey, 110_000)
+	gasLimit, err := client.EstimateGas(context.Background(), callObj)
 	if err != nil {
-		log.Fatal("signing tx error: ", err)
+		return "", err
+	}
+
+	signedTx, err := client.SignTx(context.Background(), callData, contractAddress, fromPrivateKey, gasLimit.Uint64())
+	if err != nil {
+		return "", err
 	}
 
 	rawBytes, err := signedTx.MarshalBinary()
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
 
-	fmt.Println(rawBytes)
-
-	rawHex := "0x" + hex.EncodeToString(rawBytes)
-	txHash, err = client.SendRawTransaction(context.Background(), rawHex)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(txHash)
-
-	fmt.Println(balance)
-	fmt.Println(balanceOf)
+	return client.SendRawTransaction(context.Background(), "0x"+hex.EncodeToString(rawBytes))
 }
