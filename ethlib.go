@@ -21,6 +21,8 @@ const (
 	pollingInterval = 6 * time.Second
 )
 
+type Option func(*Client)
+
 type Client struct {
 	endpoint         string
 	http             *http.Client
@@ -29,13 +31,39 @@ type Client struct {
 	solid            bool
 }
 
-func NewClient(endpoint string, chainID *big.Int, solid bool, multicallAddress string) *Client {
-	return &Client{
+func New(
+	endpoint string,
+	chainID *big.Int,
+	multicallAddress string,
+	options ...Option,
+) *Client {
+	c := &Client{
 		endpoint:         endpoint,
 		http:             http.DefaultClient,
 		chainID:          new(big.Int).Set(chainID),
 		multicallAddress: multicallAddress,
-		solid:            solid,
+	}
+
+	for _, option := range options {
+		option(c)
+	}
+
+	return c
+}
+
+func NewSolid(endpoint string, chainID *big.Int, multicallAddress string, options ...Option) *Client {
+	return New(endpoint, chainID, multicallAddress, append(options, WithSolid(true))...)
+}
+
+func WithHTTPClient(httpClient *http.Client) Option {
+	return func(c *Client) {
+		c.http = httpClient
+	}
+}
+
+func WithSolid(solid bool) Option {
+	return func(c *Client) {
+		c.solid = solid
 	}
 }
 
@@ -58,10 +86,10 @@ type rpcError struct {
 	Message string `json:"message"`
 }
 
-func (c *Client) BalanceAt(ctx context.Context, addr string) (*big.Int, error) {
+func (c *Client) BalanceAt(ctx context.Context, address string) (*big.Int, error) {
 	blockTag := c.getBlock()
 	var result string
-	if err := c.rpcCall(ctx, "eth_getBalance", []interface{}{addr, blockTag}, &result); err != nil {
+	if err := c.rpcCall(ctx, "eth_getBalance", []interface{}{address, blockTag}, &result); err != nil {
 		return nil, err
 	}
 
@@ -101,8 +129,8 @@ func (c *Client) SendRawTransaction(ctx context.Context, rawHex string) (string,
 	return txHashHex, nil
 }
 
-func (c *Client) TransferNative(ctx context.Context, to string, amountWei *big.Int, privKeyHex string) (string, error) {
-	privKey, err := crypto.HexToECDSA(trim0x(privKeyHex))
+func (c *Client) TransferNative(ctx context.Context, to string, amount *big.Int, privateKey string) (string, error) {
+	privKey, err := crypto.HexToECDSA(trim0x(privateKey))
 	if err != nil {
 		return "", err
 	}
@@ -120,7 +148,7 @@ func (c *Client) TransferNative(ctx context.Context, to string, amountWei *big.I
 	}
 
 	gasLimit := uint64(21000)
-	tx := types.NewTransaction(nonce.Uint64(), common.HexToAddress(to), amountWei, gasLimit, gasPrice, nil)
+	tx := types.NewTransaction(nonce.Uint64(), common.HexToAddress(to), amount, gasLimit, gasPrice, nil)
 	signer := types.LatestSignerForChainID(c.chainID)
 	signedTx, err := types.SignTx(tx, signer, privKey)
 	if err != nil {
@@ -188,12 +216,12 @@ func (c *Client) SignTx(
 
 func (c *Client) TransferToken(
 	ctx context.Context,
-	tokenAddr string,
+	tokenAddress string,
 	to string,
 	amount *big.Int,
-	privateKeyHex string,
+	privateKey string,
 ) (string, error) {
-	privKey, err := crypto.HexToECDSA(trim0x(privateKeyHex))
+	privKey, err := crypto.HexToECDSA(trim0x(privateKey))
 	if err != nil {
 		return "", err
 	}
@@ -207,7 +235,7 @@ func (c *Client) TransferToken(
 
 	callObj := map[string]interface{}{
 		"from": from.Hex(),
-		"to":   tokenAddr,
+		"to":   tokenAddress,
 		"data": data,
 	}
 
@@ -233,7 +261,7 @@ func (c *Client) TransferToken(
 
 	tx := types.NewTransaction(
 		nonce.Uint64(),
-		common.HexToAddress(tokenAddr),
+		common.HexToAddress(tokenAddress),
 		big.NewInt(0),
 		gasLimit.Uint64(),
 		gasPrice,
@@ -305,8 +333,8 @@ func (c *Client) WaitForStatusSuccess(
 
 func (c *Client) BalanceOfMulticall(
 	ctx context.Context,
-	tokenAddr string,
-	users []string,
+	tokenAddress string,
+	accounts []string,
 ) ([]*big.Int, error) {
 	parsedABI, err := abi.JSON(strings.NewReader(multicall3Aggregate3ABI))
 	if err != nil {
@@ -319,9 +347,9 @@ func (c *Client) BalanceOfMulticall(
 		CallData     []byte
 	}
 
-	calls := make([]call3, 0, len(users))
-	for _, user := range users {
-		callDataStr, err := BuildETHFunctionData(balanceOfSignature, user)
+	calls := make([]call3, 0, len(accounts))
+	for _, account := range accounts {
+		callDataStr, err := BuildETHFunctionData(balanceOfSignature, account)
 		if err != nil {
 			return nil, err
 		}
@@ -331,7 +359,7 @@ func (c *Client) BalanceOfMulticall(
 		}
 
 		calls = append(calls, call3{
-			Target:       common.HexToAddress(tokenAddr),
+			Target:       common.HexToAddress(tokenAddress),
 			AllowFailure: false,
 			CallData:     callDataBytes,
 		})
@@ -369,7 +397,7 @@ func (c *Client) BalanceOfMulticall(
 	balances := make([]*big.Int, len(results))
 	for i, r := range results {
 		if !r.Success {
-			return nil, fmt.Errorf("failed to get balance of %s", users[i])
+			return nil, fmt.Errorf("failed to get balance of %s", accounts[i])
 		}
 
 		out := new(big.Int).SetBytes(r.ReturnData[len(r.ReturnData)-32:])

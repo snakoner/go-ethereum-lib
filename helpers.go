@@ -25,9 +25,9 @@ func (c *Client) EstimateGas(ctx context.Context, callObj map[string]interface{}
 	return parseHexBigInt(gasHex)
 }
 
-func (c *Client) GetNonce(ctx context.Context, addr string) (*big.Int, error) {
+func (c *Client) GetNonce(ctx context.Context, account string) (*big.Int, error) {
 	var nonceHex string
-	if err := c.rpcCall(ctx, "eth_getTransactionCount", []interface{}{addr, "pending"}, &nonceHex); err != nil {
+	if err := c.rpcCall(ctx, "eth_getTransactionCount", []interface{}{account, "pending"}, &nonceHex); err != nil {
 		return nil, err
 	}
 	return parseHexBigInt(nonceHex)
@@ -127,7 +127,7 @@ func BuildETHFunctionData(functionSig string, params ...any) (string, error) {
 		return "", errors.New("empty function signature")
 	}
 
-	paramHex, err := BuildETHABIParams(functionSig, params...)
+	paramHex, err := buildETHABIParams(functionSig, params...)
 	if err != nil {
 		return "", err
 	}
@@ -136,7 +136,7 @@ func BuildETHFunctionData(functionSig string, params ...any) (string, error) {
 	return "0x" + hex.EncodeToString(selector) + paramHex, nil
 }
 
-func BuildETHABIParams(functionSig string, params ...any) (string, error) {
+func buildETHABIParams(functionSig string, params ...any) (string, error) {
 	types, err := parseETHFunctionSignature(functionSig)
 	if err != nil {
 		return "", err
