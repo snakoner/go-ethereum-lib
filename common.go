@@ -51,12 +51,6 @@ func (c *Client) getBlock() string {
 }
 
 func (c *Client) rpcCall(ctx context.Context, method string, params []interface{}, out interface{}) error {
-	if c.timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.timeout)
-		defer cancel()
-	}
-
 	reqBody, err := json.Marshal(rpcRequest{
 		JSONRPC: "2.0",
 		ID:      1,

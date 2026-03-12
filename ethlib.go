@@ -25,7 +25,6 @@ type Client struct {
 	endpoint         string
 	http             *http.Client
 	chainID          *big.Int
-	timeout          time.Duration
 	multicallAddress string
 	solid            bool
 }
