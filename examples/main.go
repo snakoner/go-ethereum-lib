@@ -25,16 +25,28 @@ func UUIDToBytes32(id uuid.UUID) [32]byte {
 
 func main() {
 	// contractAddress := "0x4710fCb1e83bd593f734A6a4910A66DF3d940c5C"
-	fromPrivateKey := "e230e23c4cd059377fa1d4cea5e83ed95acdf2faa49cca063a59326067199425"
+	// fromPrivateKey := "e230e23c4cd059377fa1d4cea5e83ed95acdf2faa49cca063a59326067199425"
 	tokenAddress := "0xC55d61E9c41432eE19Ca0a823A82F1ef15998E58"
 
-	address, err := ethlib.PrivateKeyToAddress(fromPrivateKey)
+	generatedPrivateKey, generatedAddress, err := ethlib.GenerateAddress()
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	fmt.Println("Generated address:", generatedAddress)
+	fmt.Println("Generated private key:", generatedPrivateKey)
+
+	address, err := ethlib.PrivateKeyToAddress(generatedPrivateKey)
+	if err != nil {
+		log.Fatal(fmt.Errorf("failed to get address from private key: %w", err))
+	}
+
 	if !ethlib.ValidateAddress(address) {
 		log.Fatal("invalid address")
+	}
+
+	if address != generatedAddress {
+		log.Fatal("generated address mismatch")
 	}
 
 	client := ethlib.New(

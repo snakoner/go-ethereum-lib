@@ -440,3 +440,13 @@ func PrivateKeyToAddress(privateKey string) (string, error) {
 func ValidateAddress(address string) bool {
 	return common.IsHexAddress(address)
 }
+
+func GenerateAddress() (string, string, error) {
+	privKey, err := crypto.GenerateKey()
+	if err != nil {
+		return "", "", err
+	}
+
+	privKeyHex := hex.EncodeToString(crypto.FromECDSA(privKey))
+	return privKeyHex, crypto.PubkeyToAddress(privKey.PublicKey).Hex(), nil
+}
