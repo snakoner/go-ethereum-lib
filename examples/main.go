@@ -13,12 +13,8 @@ import (
 )
 
 const (
-	sepoliaRPCURL           = "https://eth-sepolia.g.alchemy.com/v2/UtjFRzFoEQd533NSskUCCCKEpW7z93t2"
+	sepoliaRPCURL           = "https://eth-sepolia.g.alchemy.com/v2/"
 	sepoliaMulticallAddress = "0xcA11bde05977b3631167028862bE2a173976CA11"
-)
-
-var (
-	sepoliaChainID = big.NewInt(11155111)
 )
 
 func UUIDToBytes32(id uuid.UUID) [32]byte {
@@ -29,17 +25,25 @@ func UUIDToBytes32(id uuid.UUID) [32]byte {
 
 func main() {
 	// contractAddress := "0x4710fCb1e83bd593f734A6a4910A66DF3d940c5C"
-	// fromPrivateKey := "e230e23c4cd059377fa1d4cea5e83ed95acdf2faa49cca063a59326067199425"
+	fromPrivateKey := "e230e23c4cd059377fa1d4cea5e83ed95acdf2faa49cca063a59326067199425"
 	tokenAddress := "0xC55d61E9c41432eE19Ca0a823A82F1ef15998E58"
+
+	address, err := ethlib.PrivateKeyToAddress(fromPrivateKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if !ethlib.ValidateAddress(address) {
+		log.Fatal("invalid address")
+	}
+
 	client := ethlib.New(
 		sepoliaRPCURL,
-		sepoliaChainID,
 		sepoliaMulticallAddress,
 	)
 
 	solidClient := ethlib.NewSolid(
 		sepoliaRPCURL,
-		sepoliaChainID,
 		sepoliaMulticallAddress,
 	)
 

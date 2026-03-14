@@ -26,21 +26,18 @@ type Option func(*Client)
 type Client struct {
 	endpoint         string
 	http             *http.Client
-	chainID          *big.Int
 	multicallAddress string
 	solid            bool
 }
 
 func New(
 	endpoint string,
-	chainID *big.Int,
 	multicallAddress string,
 	options ...Option,
 ) *Client {
 	c := &Client{
 		endpoint:         endpoint,
 		http:             http.DefaultClient,
-		chainID:          new(big.Int).Set(chainID),
 		multicallAddress: multicallAddress,
 	}
 
@@ -51,8 +48,8 @@ func New(
 	return c
 }
 
-func NewSolid(endpoint string, chainID *big.Int, multicallAddress string, options ...Option) *Client {
-	return New(endpoint, chainID, multicallAddress, append(options, WithSolid(true))...)
+func NewSolid(endpoint string, multicallAddress string, options ...Option) *Client {
+	return New(endpoint, multicallAddress, append(options, WithSolid(true))...)
 }
 
 func WithHTTPClient(httpClient *http.Client) Option {
@@ -129,6 +126,15 @@ func (c *Client) SendRawTransaction(ctx context.Context, rawHex string) (string,
 	return txHashHex, nil
 }
 
+func (c *Client) GetChainID(ctx context.Context) (*big.Int, error) {
+	var chainIDHex string
+	if err := c.rpcCall(ctx, "eth_chainId", []interface{}{}, &chainIDHex); err != nil {
+		return nil, err
+	}
+
+	return parseHexBigInt(chainIDHex)
+}
+
 func (c *Client) TransferNative(ctx context.Context, to string, amount *big.Int, privateKey string) (string, error) {
 	privKey, err := crypto.HexToECDSA(trim0x(privateKey))
 	if err != nil {
@@ -147,9 +153,14 @@ func (c *Client) TransferNative(ctx context.Context, to string, amount *big.Int,
 		return "", err
 	}
 
+	chainID, err := c.GetChainID(ctx)
+	if err != nil {
+		return "", err
+	}
+
 	gasLimit := uint64(21000)
 	tx := types.NewTransaction(nonce.Uint64(), common.HexToAddress(to), amount, gasLimit, gasPrice, nil)
-	signer := types.LatestSignerForChainID(c.chainID)
+	signer := types.LatestSignerForChainID(chainID)
 	signedTx, err := types.SignTx(tx, signer, privKey)
 	if err != nil {
 		return "", err
@@ -197,6 +208,11 @@ func (c *Client) SignTx(
 		return nil, err
 	}
 
+	chainID, err := c.GetChainID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	tx := types.NewTransaction(
 		nonce.Uint64(),
 		common.HexToAddress(to),
@@ -205,7 +221,7 @@ func (c *Client) SignTx(
 		gasPrice,
 		txBytes,
 	)
-	signer := types.LatestSignerForChainID(c.chainID)
+	signer := types.LatestSignerForChainID(chainID)
 	signedTx, err := types.SignTx(tx, signer, privECDSA)
 	if err != nil {
 		return nil, err
@@ -259,6 +275,11 @@ func (c *Client) TransferToken(
 		return "", err
 	}
 
+	chainID, err := c.GetChainID(ctx)
+	if err != nil {
+		return "", err
+	}
+
 	tx := types.NewTransaction(
 		nonce.Uint64(),
 		common.HexToAddress(tokenAddress),
@@ -267,7 +288,7 @@ func (c *Client) TransferToken(
 		gasPrice,
 		txBytes,
 	)
-	signer := types.LatestSignerForChainID(c.chainID)
+	signer := types.LatestSignerForChainID(chainID)
 	signedTx, err := types.SignTx(tx, signer, privKey)
 	if err != nil {
 		return "", err
@@ -405,4 +426,17 @@ func (c *Client) BalanceOfMulticall(
 	}
 
 	return balances, nil
+}
+
+func PrivateKeyToAddress(privateKey string) (string, error) {
+	privKey, err := crypto.HexToECDSA(trim0x(privateKey))
+	if err != nil {
+		return "", err
+	}
+
+	return crypto.PubkeyToAddress(privKey.PublicKey).Hex(), nil
+}
+
+func ValidateAddress(address string) bool {
+	return common.IsHexAddress(address)
 }
