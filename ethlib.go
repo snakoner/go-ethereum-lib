@@ -428,6 +428,14 @@ func (c *Client) BalanceOfMulticall(
 	return balances, nil
 }
 
+func (c *Client) Call(ctx context.Context, callObj map[string]interface{}) (string, error) {
+	var result string
+	if err := c.rpcCall(ctx, "eth_call", []interface{}{callObj, c.getBlock()}, &result); err != nil {
+		return "", err
+	}
+	return result, nil
+}
+
 func PrivateKeyToAddress(privateKey string) (string, error) {
 	privKey, err := crypto.HexToECDSA(trim0x(privateKey))
 	if err != nil {
