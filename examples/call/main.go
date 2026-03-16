@@ -14,16 +14,21 @@ import (
 
 func main() {
 	client := ethlib.New(
-		"https://eth-mainnet.g.alchemy.com/v2/",
+		"https://eth-mainnet.g.alchemy.com/v2/n5x-zw80",
 		"0xcA11bde05977b3631167028862bE2a173976CA11",
 	)
 
-	price, err := getUniswapPrice(context.Background(), client, "0x1320483123658e2192CEb6c4150a759f4398c5e4")
+	uniswapPrice, err := getUniswapPrice(context.Background(), client, "0x1320483123658e2192CEb6c4150a759f4398c5e4")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println(price)
+	curvePrice, err := getCurvePrice(context.Background(), client, "0x6323a138fee57a4d68cf9e79d7ac08e4069fd860", 1, 0, 6, 6)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(1/uniswapPrice, curvePrice)
 }
 
 func mustNewType(t string) abi.Type {
@@ -84,4 +89,63 @@ func getUniswapPrice(ctx context.Context, client *ethlib.Client, poolAddress str
 	priceFloat, _ := price.Float64()
 
 	return priceFloat, nil
+}
+
+func getCurvePrice(
+	ctx context.Context,
+	client *ethlib.Client,
+	pool string,
+	i int64,
+	j int64,
+	decimalsIn int,
+	decimalsOut int,
+) (float64, error) {
+	dx := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimalsIn)), nil)
+
+	callData, err := ethlib.BuildETHFunctionData(
+		"get_dy(int128,int128,uint256)",
+		big.NewInt(i),
+		big.NewInt(j),
+		dx,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	callObj := map[string]interface{}{
+		"to":   pool,
+		"data": callData,
+	}
+
+	resp, err := client.Call(ctx, callObj)
+	if err != nil {
+		return 0, err
+	}
+
+	resBytes, err := hex.DecodeString(strings.TrimPrefix(resp, "0x"))
+	if err != nil {
+		return 0, err
+	}
+
+	args := abi.Arguments{
+		{Type: mustNewType("uint256")},
+	}
+
+	values, err := args.Unpack(resBytes)
+	if err != nil {
+		return 0, err
+	}
+
+	dy, ok := values[0].(*big.Int)
+	if !ok {
+		return 0, fmt.Errorf("invalid dy")
+	}
+
+	num := new(big.Float).SetInt(dy)
+	den := new(big.Float).SetInt(
+		new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimalsOut)), nil),
+	)
+
+	price, _ := new(big.Float).Quo(num, den).Float64()
+	return price, nil
 }

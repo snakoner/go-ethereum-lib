@@ -204,6 +204,8 @@ func encodeETHABIParamByType(typ string, v any) (string, error) {
 		return encodeETHABIUint256(v)
 	case "int256":
 		return encodeETHABIInt256(v)
+	case "int128":
+		return encodeETHABIInt128(v)
 	case "bool":
 		return encodeETHABIBool(v)
 	case "bytes32":
@@ -261,6 +263,28 @@ func encodeETHABIInt256(v any) (string, error) {
 
 	mod := new(big.Int).Lsh(big.NewInt(1), 256)
 	twosComplement := new(big.Int).Add(mod, n)
+	return leftPad64(strings.TrimLeft(twosComplement.Text(16), "0")), nil
+}
+
+func encodeETHABIInt128(v any) (string, error) {
+	n, err := toBigInt(v)
+	if err != nil {
+		return "", err
+	}
+
+	limit := new(big.Int).Lsh(big.NewInt(1), 127)
+
+	if n.Cmp(limit) >= 0 || n.Cmp(new(big.Int).Neg(limit)) < 0 {
+		return "", errors.New("int128 overflow")
+	}
+
+	if n.Sign() >= 0 {
+		return leftPad64(strings.TrimLeft(n.Text(16), "0")), nil
+	}
+
+	mod := new(big.Int).Lsh(big.NewInt(1), 256)
+	twosComplement := new(big.Int).Add(mod, n)
+
 	return leftPad64(strings.TrimLeft(twosComplement.Text(16), "0")), nil
 }
 
