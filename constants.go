@@ -1,8 +1,9 @@
 package ethlib
 
 const (
-	balanceOfSignature = "balanceOf(address)"
-	transferSignature  = "transfer(address,uint256)"
+	balanceOfSignature     = "balanceOf(address)"
+	transferSignature      = "transfer(address,uint256)"
+	getEthBalanceSignature = "getEthBalance(address)"
 )
 
 const multicall3Aggregate3ABI = `[

@@ -14,21 +14,19 @@ import (
 
 func main() {
 	client := ethlib.New(
-		"https://eth-mainnet.g.alchemy.com/v2/n5x-zw80",
+		"https://eth-mainnet.g.alchemy.com/v2/n5x-siXFHP3bEokNDewq5cPfL2a-zw80",
 		"0xcA11bde05977b3631167028862bE2a173976CA11",
 	)
 
-	uniswapPrice, err := getUniswapPrice(context.Background(), client, "0x1320483123658e2192CEb6c4150a759f4398c5e4")
+	ethBalances, err := client.BalanceAtMulticall(context.Background(), []string{
+		"0x3014fc2f6bff376142626fcc810c11dd069dda4c",
+		"0x6323a138fee57a4d68cf9e79d7ac08e4069fd860",
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	curvePrice, err := getCurvePrice(context.Background(), client, "0x6323a138fee57a4d68cf9e79d7ac08e4069fd860", 1, 0, 6, 6)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(1/uniswapPrice, curvePrice)
+	fmt.Println(ethBalances)
 }
 
 func mustNewType(t string) abi.Type {

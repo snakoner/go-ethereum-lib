@@ -428,6 +428,82 @@ func (c *Client) BalanceOfMulticall(
 	return balances, nil
 }
 
+func (c *Client) BalanceAtMulticall(
+	ctx context.Context,
+	accounts []string,
+) ([]*big.Int, error) {
+	parsedABI, err := abi.JSON(strings.NewReader(multicall3Aggregate3ABI))
+	if err != nil {
+		return nil, err
+	}
+
+	type call3 struct {
+		Target       common.Address
+		AllowFailure bool
+		CallData     []byte
+	}
+
+	calls := make([]call3, 0, len(accounts))
+	for _, account := range accounts {
+		callDataStr, err := BuildETHFunctionData("getEthBalance(address)", account)
+		if err != nil {
+			return nil, err
+		}
+
+		callDataBytes, err := hex.DecodeString(trim0x(callDataStr))
+		if err != nil {
+			return nil, err
+		}
+
+		calls = append(calls, call3{
+			Target:       common.HexToAddress(c.multicallAddress),
+			AllowFailure: false,
+			CallData:     callDataBytes,
+		})
+	}
+
+	data, err := parsedABI.Pack("aggregate3", calls)
+	if err != nil {
+		return nil, err
+	}
+
+	callObj := map[string]interface{}{
+		"to":   c.multicallAddress,
+		"data": "0x" + hex.EncodeToString(data),
+	}
+
+	blockTag := c.getBlock()
+	var resultHex string
+	if err := c.rpcCall(ctx, "eth_call", []interface{}{callObj, blockTag}, &resultHex); err != nil {
+		return nil, err
+	}
+
+	resBytes, err := hex.DecodeString(trim0x(resultHex))
+	if err != nil {
+		return nil, err
+	}
+
+	var results []struct {
+		Success    bool
+		ReturnData []byte
+	}
+	if err := parsedABI.UnpackIntoInterface(&results, "aggregate3", resBytes); err != nil {
+		return nil, err
+	}
+
+	balances := make([]*big.Int, len(results))
+	for i, r := range results {
+		if !r.Success {
+			return nil, fmt.Errorf("failed to get native balance of %s", accounts[i])
+		}
+
+		out := new(big.Int).SetBytes(r.ReturnData[len(r.ReturnData)-32:])
+		balances[i] = out
+	}
+
+	return balances, nil
+}
+
 func (c *Client) Call(ctx context.Context, callObj map[string]interface{}) (string, error) {
 	var result string
 	if err := c.rpcCall(ctx, "eth_call", []interface{}{callObj, c.getBlock()}, &result); err != nil {
