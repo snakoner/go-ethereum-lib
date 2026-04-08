@@ -13,13 +13,14 @@ import (
 )
 
 func main() {
-	client := ethlib.New(
-		"https://eth-mainnet.g.alchemy.com/v2/n5x-siXFHP3bEokNDewq5cPfL2a-zw80",
+	solidClient := ethlib.NewSolid(
+		"https://eth-sepolia.g.alchemy.com/v2/<>",
 		"0xcA11bde05977b3631167028862bE2a173976CA11",
+		100,
 	)
 
-	ethBalances, err := client.BalanceAtMulticall(context.Background(), []string{
-		"0x3014fc2f6bff376142626fcc810c11dd069dda4c",
+	ethBalances, err := solidClient.BalanceAtMulticall(context.Background(), []string{
+		"0xDf8F2FA7F54277E802D04cbdDFab6DCEACAb672a",
 		"0x6323a138fee57a4d68cf9e79d7ac08e4069fd860",
 	})
 	if err != nil {
