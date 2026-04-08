@@ -496,8 +496,6 @@ func (c *Client) BalanceAtMulticall(
 		return nil, err
 	}
 
-	fmt.Println("blockTag", blockTag)
-
 	var resultHex string
 	if err := c.rpcCall(ctx, "eth_call", []interface{}{callObj, blockTag}, &resultHex); err != nil {
 		return nil, err
