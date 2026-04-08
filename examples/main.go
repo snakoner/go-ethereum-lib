@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	sepoliaRPCURL           = "https://eth-sepolia.g.alchemy.com/v2/"
+	sepoliaRPCURL           = "https://eth-sepolia.g.alchemy.com/v2/<>"
 	sepoliaMulticallAddress = "0xcA11bde05977b3631167028862bE2a173976CA11"
 )
 
@@ -57,6 +57,7 @@ func main() {
 	solidClient := ethlib.NewSolid(
 		sepoliaRPCURL,
 		sepoliaMulticallAddress,
+		5,
 	)
 
 	balancesOf, err := client.BalanceOfMulticall(

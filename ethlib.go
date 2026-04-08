@@ -27,7 +27,7 @@ type Client struct {
 	endpoint         string
 	http             *http.Client
 	multicallAddress string
-	solid            bool
+	confirmations    int64
 }
 
 func New(
@@ -48,8 +48,12 @@ func New(
 	return c
 }
 
-func NewSolid(endpoint string, multicallAddress string, options ...Option) *Client {
-	return New(endpoint, multicallAddress, append(options, WithSolid(true))...)
+func NewSolid(endpoint string, multicallAddress string, confirmations int64, options ...Option) *Client {
+	if confirmations == 0 {
+		return New(endpoint, multicallAddress, options...)
+	}
+
+	return New(endpoint, multicallAddress, append(options, WithConfirmations(confirmations))...)
 }
 
 func WithHTTPClient(httpClient *http.Client) Option {
@@ -58,9 +62,9 @@ func WithHTTPClient(httpClient *http.Client) Option {
 	}
 }
 
-func WithSolid(solid bool) Option {
+func WithConfirmations(confirmations int64) Option {
 	return func(c *Client) {
-		c.solid = solid
+		c.confirmations = confirmations
 	}
 }
 
@@ -84,7 +88,11 @@ type rpcError struct {
 }
 
 func (c *Client) BalanceAt(ctx context.Context, address string) (*big.Int, error) {
-	blockTag := c.getBlock()
+	blockTag, err := c.getBlock(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var result string
 	if err := c.rpcCall(ctx, "eth_getBalance", []interface{}{address, blockTag}, &result); err != nil {
 		return nil, err
@@ -104,7 +112,11 @@ func (c *Client) BalanceOf(ctx context.Context, tokenAddress string, address str
 		"data": data,
 	}
 
-	blockTag := c.getBlock()
+	blockTag, err := c.getBlock(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var result string
 	if err := c.rpcCall(ctx, "eth_call", []interface{}{callObj, blockTag}, &result); err != nil {
 		return nil, err
@@ -396,7 +408,11 @@ func (c *Client) BalanceOfMulticall(
 		"data": "0x" + hex.EncodeToString(data),
 	}
 
-	blockTag := c.getBlock()
+	blockTag, err := c.getBlock(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var resultHex string
 	if err := c.rpcCall(ctx, "eth_call", []interface{}{callObj, blockTag}, &resultHex); err != nil {
 		return nil, err
@@ -472,7 +488,13 @@ func (c *Client) BalanceAtMulticall(
 		"data": "0x" + hex.EncodeToString(data),
 	}
 
-	blockTag := c.getBlock()
+	blockTag, err := c.getBlock(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("blockTag", blockTag)
+
 	var resultHex string
 	if err := c.rpcCall(ctx, "eth_call", []interface{}{callObj, blockTag}, &resultHex); err != nil {
 		return nil, err
@@ -505,10 +527,16 @@ func (c *Client) BalanceAtMulticall(
 }
 
 func (c *Client) Call(ctx context.Context, callObj map[string]interface{}) (string, error) {
-	var result string
-	if err := c.rpcCall(ctx, "eth_call", []interface{}{callObj, c.getBlock()}, &result); err != nil {
+	blockTag, err := c.getBlock(ctx)
+	if err != nil {
 		return "", err
 	}
+
+	var result string
+	if err := c.rpcCall(ctx, "eth_call", []interface{}{callObj, blockTag}, &result); err != nil {
+		return "", err
+	}
+
 	return result, nil
 }
 

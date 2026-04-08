@@ -42,12 +42,26 @@ func (c *Client) GetGasPrice(ctx context.Context) (*big.Int, error) {
 	return parseHexBigInt(gasPriceHex)
 }
 
-func (c *Client) getBlock() string {
-	if !c.solid {
-		return "latest"
+func (c *Client) getCurrentBlock(ctx context.Context) (*big.Int, error) {
+	var blockHex string
+	if err := c.rpcCall(ctx, "eth_blockNumber", []interface{}{}, &blockHex); err != nil {
+		return nil, err
 	}
 
-	return "safe"
+	return parseHexBigInt(blockHex)
+}
+
+func (c *Client) getBlock(ctx context.Context) (string, error) {
+	if c.confirmations > 0 {
+		currentBlock, err := c.getCurrentBlock(ctx)
+		if err != nil {
+			return "", err
+		}
+
+		return fmt.Sprintf("0x%x", currentBlock.Sub(currentBlock, big.NewInt(c.confirmations))), nil
+	}
+
+	return "latest", nil
 }
 
 func (c *Client) rpcCall(ctx context.Context, method string, params []interface{}, out interface{}) error {
