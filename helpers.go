@@ -399,3 +399,13 @@ func leftPad64(hexNoPrefix string) string {
 	}
 	return strings.Repeat("0", 64-len(hexNoPrefix)) + hexNoPrefix
 }
+
+func float64ToRational(value float64) (*big.Int, *big.Int) {
+	r := new(big.Rat)
+	r.SetFloat64(value)
+
+	num := r.Num()
+	den := r.Denom()
+
+	return num, den
+}
