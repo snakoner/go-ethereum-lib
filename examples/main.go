@@ -58,6 +58,7 @@ func main() {
 		sepoliaRPCURL,
 		sepoliaMulticallAddress,
 		5,
+		1.11,
 	)
 
 	balancesOf, err := client.BalanceOfMulticall(
