@@ -28,8 +28,8 @@ type Client struct {
 	http             *http.Client
 	multicallAddress string
 	confirmations    int64
-	num              *big.Int
-	den              *big.Int
+	gasBoostNum      *big.Int
+	gasBoostDen      *big.Int
 }
 
 func New(
@@ -41,8 +41,9 @@ func New(
 		endpoint:         endpoint,
 		http:             http.DefaultClient,
 		multicallAddress: multicallAddress,
-		num:              big.NewInt(1),
-		den:              big.NewInt(1),
+		gasBoostNum:      big.NewInt(1),
+		gasBoostDen:      big.NewInt(1),
+		confirmations:    0,
 	}
 
 	for _, option := range options {
@@ -50,18 +51,6 @@ func New(
 	}
 
 	return c
-}
-
-func NewSolid(endpoint string, multicallAddress string, confirmations int64, gasBoost float64, options ...Option) *Client {
-	if gasBoost > 0 {
-		options = append(options, WithGasBoost(gasBoost))
-	}
-
-	if confirmations > 0 {
-		options = append(options, WithConfirmations(confirmations))
-	}
-
-	return New(endpoint, multicallAddress, options...)
 }
 
 func WithHTTPClient(httpClient *http.Client) Option {
@@ -78,7 +67,7 @@ func WithConfirmations(confirmations int64) Option {
 
 func WithGasBoost(gasBoost float64) Option {
 	return func(c *Client) {
-		c.num, c.den = float64ToRational(gasBoost)
+		c.gasBoostNum, c.gasBoostDen = float64ToRational(gasBoost)
 	}
 }
 
@@ -179,8 +168,8 @@ func (c *Client) TransferNative(ctx context.Context, to string, amount *big.Int,
 		return "", err
 	}
 
-	gasPrice.Mul(gasPrice, c.num)
-	gasPrice.Div(gasPrice, c.den)
+	gasPrice.Mul(gasPrice, c.gasBoostNum)
+	gasPrice.Div(gasPrice, c.gasBoostDen)
 
 	chainID, err := c.GetChainID(ctx)
 	if err != nil {
@@ -237,8 +226,8 @@ func (c *Client) SignTx(
 		return nil, err
 	}
 
-	gasPrice.Mul(gasPrice, c.num)
-	gasPrice.Div(gasPrice, c.den)
+	gasPrice.Mul(gasPrice, c.gasBoostNum)
+	gasPrice.Div(gasPrice, c.gasBoostDen)
 
 	chainID, err := c.GetChainID(ctx)
 	if err != nil {
@@ -302,8 +291,8 @@ func (c *Client) TransferToken(
 		return "", err
 	}
 
-	gasPrice.Mul(gasPrice, c.num)
-	gasPrice.Div(gasPrice, c.den)
+	gasPrice.Mul(gasPrice, c.gasBoostNum)
+	gasPrice.Div(gasPrice, c.gasBoostDen)
 
 	txBytes, err := hex.DecodeString(trim0x(data))
 	if err != nil {

@@ -13,11 +13,11 @@ import (
 )
 
 func main() {
-	solidClient := ethlib.NewSolid(
+	solidClient := ethlib.New(
 		"https://eth-sepolia.g.alchemy.com/v2/<>",
 		"0xcA11bde05977b3631167028862bE2a173976CA11",
-		100,
-		1.11,
+		ethlib.WithConfirmations(100),
+		ethlib.WithGasBoost(1.11),
 	)
 
 	ethBalances, err := solidClient.BalanceAtMulticall(context.Background(), []string{

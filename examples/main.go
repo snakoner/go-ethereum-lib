@@ -54,11 +54,11 @@ func main() {
 		sepoliaMulticallAddress,
 	)
 
-	solidClient := ethlib.NewSolid(
+	solidClient := ethlib.New(
 		sepoliaRPCURL,
 		sepoliaMulticallAddress,
-		5,
-		1.11,
+		ethlib.WithConfirmations(5),
+		ethlib.WithGasBoost(1.11),
 	)
 
 	balancesOf, err := client.BalanceOfMulticall(
