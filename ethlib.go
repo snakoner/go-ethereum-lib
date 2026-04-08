@@ -168,9 +168,6 @@ func (c *Client) TransferNative(ctx context.Context, to string, amount *big.Int,
 		return "", err
 	}
 
-	gasPrice.Mul(gasPrice, c.gasBoostNum)
-	gasPrice.Div(gasPrice, c.gasBoostDen)
-
 	chainID, err := c.GetChainID(ctx)
 	if err != nil {
 		return "", err
@@ -225,9 +222,6 @@ func (c *Client) SignTx(
 	if err != nil {
 		return nil, err
 	}
-
-	gasPrice.Mul(gasPrice, c.gasBoostNum)
-	gasPrice.Div(gasPrice, c.gasBoostDen)
 
 	chainID, err := c.GetChainID(ctx)
 	if err != nil {
@@ -290,9 +284,6 @@ func (c *Client) TransferToken(
 	if err != nil {
 		return "", err
 	}
-
-	gasPrice.Mul(gasPrice, c.gasBoostNum)
-	gasPrice.Div(gasPrice, c.gasBoostDen)
 
 	txBytes, err := hex.DecodeString(trim0x(data))
 	if err != nil {

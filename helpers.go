@@ -39,7 +39,15 @@ func (c *Client) GetGasPrice(ctx context.Context) (*big.Int, error) {
 		return nil, err
 	}
 
-	return parseHexBigInt(gasPriceHex)
+	gasPrice, err := parseHexBigInt(gasPriceHex)
+	if err != nil {
+		return nil, err
+	}
+
+	gasPrice.Mul(gasPrice, c.gasBoostNum)
+	gasPrice.Div(gasPrice, c.gasBoostDen)
+
+	return gasPrice, nil
 }
 
 func (c *Client) getCurrentBlock(ctx context.Context) (*big.Int, error) {
