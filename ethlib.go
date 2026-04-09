@@ -250,8 +250,9 @@ func (c *Client) TransferToken(
 	tokenAddress string,
 	to string,
 	amount *big.Int,
-	gasPrice *big.Int,
 	privateKey string,
+	gasPrice *big.Int,
+	gasLimit *big.Int,
 ) (string, error) {
 	privKey, err := crypto.HexToECDSA(trim0x(privateKey))
 	if err != nil {
@@ -271,9 +272,11 @@ func (c *Client) TransferToken(
 		"data": data,
 	}
 
-	gasLimit, err := c.EstimateGas(ctx, callObj)
-	if err != nil {
-		return "", err
+	if gasLimit == nil {
+		gasLimit, err = c.EstimateGas(ctx, callObj)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	if gasPrice == nil {
