@@ -250,6 +250,7 @@ func (c *Client) TransferToken(
 	tokenAddress string,
 	to string,
 	amount *big.Int,
+	gasPrice *big.Int,
 	privateKey string,
 ) (string, error) {
 	privKey, err := crypto.HexToECDSA(trim0x(privateKey))
@@ -275,12 +276,14 @@ func (c *Client) TransferToken(
 		return "", err
 	}
 
-	nonce, err := c.GetNonce(ctx, from.Hex())
-	if err != nil {
-		return "", err
+	if gasPrice == nil {
+		gasPrice, err = c.GetGasPrice(ctx)
+		if err != nil {
+			return "", err
+		}
 	}
 
-	gasPrice, err := c.GetGasPrice(ctx)
+	nonce, err := c.GetNonce(ctx, from.Hex())
 	if err != nil {
 		return "", err
 	}
