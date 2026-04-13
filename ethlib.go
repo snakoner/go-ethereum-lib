@@ -569,3 +569,86 @@ func GenerateAddress() (string, string, error) {
 	privKeyHex := hex.EncodeToString(crypto.FromECDSA(privKey))
 	return privKeyHex, crypto.PubkeyToAddress(privKey.PublicKey).Hex(), nil
 }
+
+type MulticallRequest struct {
+	Target   string
+	CallData string
+}
+
+type MulticallResult struct {
+	Success    bool
+	ReturnData []byte
+}
+
+func (c *Client) Multicall(
+	ctx context.Context,
+	requests []MulticallRequest,
+) ([]MulticallResult, error) {
+	parsedABI, err := abi.JSON(strings.NewReader(multicall3Aggregate3ABI))
+	if err != nil {
+		return nil, err
+	}
+
+	type call3 struct {
+		Target       common.Address
+		AllowFailure bool
+		CallData     []byte
+	}
+
+	calls := make([]call3, 0, len(requests))
+	for _, req := range requests {
+		callDataBytes, err := hex.DecodeString(trim0x(req.CallData))
+		if err != nil {
+			return nil, err
+		}
+		calls = append(calls, call3{
+			Target:       common.HexToAddress(req.Target),
+			AllowFailure: false,
+			CallData:     callDataBytes,
+		})
+	}
+
+	data, err := parsedABI.Pack("aggregate3", calls)
+	if err != nil {
+		return nil, err
+	}
+
+	blockTag, err := c.getBlock(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var resultHex string
+	if err := c.rpcCall(ctx, "eth_call", []interface{}{
+		map[string]interface{}{
+			"to":   c.multicallAddress,
+			"data": "0x" + hex.EncodeToString(data),
+		},
+		blockTag,
+	}, &resultHex); err != nil {
+		return nil, err
+	}
+
+	resBytes, err := hex.DecodeString(trim0x(resultHex))
+	if err != nil {
+		return nil, err
+	}
+
+	var results []struct {
+		Success    bool
+		ReturnData []byte
+	}
+	if err := parsedABI.UnpackIntoInterface(&results, "aggregate3", resBytes); err != nil {
+		return nil, err
+	}
+
+	out := make([]MulticallResult, len(results))
+	for i, r := range results {
+		out[i] = MulticallResult{
+			Success:    r.Success,
+			ReturnData: r.ReturnData,
+		}
+	}
+
+	return out, nil
+}

@@ -12,6 +12,18 @@ import (
 	ethlib "github.com/snakoner/go-ethereum-lib"
 )
 
+type EthereumBlockchain struct {
+	Client           *ethlib.Client
+	MulticallAddress string
+}
+
+func NewEthereumBlockchain(client *ethlib.Client, multicallAddress string) *EthereumBlockchain {
+	return &EthereumBlockchain{
+		Client:           client,
+		MulticallAddress: multicallAddress,
+	}
+}
+
 func main() {
 	solidClient := ethlib.New(
 		"https://eth-sepolia.g.alchemy.com/v2/<>",
@@ -29,6 +41,15 @@ func main() {
 	}
 
 	fmt.Println(ethBalances)
+
+	blockchain := NewEthereumBlockchain(solidClient, "0xcA11bde05977b3631167028862bE2a173976CA11")
+	tok, gas, err := blockchain.TokenAndNativeBalance(context.Background(), "0xC55d61E9c41432eE19Ca0a823A82F1ef15998E58", "0xDf8F2FA7F54277E802D04cbdDFab6DCEACAb672a")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(tok)
+	fmt.Println(gas)
 }
 
 func mustNewType(t string) abi.Type {
@@ -148,4 +169,40 @@ func getCurvePrice(
 
 	price, _ := new(big.Float).Quo(num, den).Float64()
 	return price, nil
+}
+
+func (b *EthereumBlockchain) TokenAndNativeBalance(
+	ctx context.Context,
+	token string,
+	address string,
+) (tokenBalance *big.Int, nativeBalance *big.Int, err error) {
+	tokenCallData, err := ethlib.BuildETHFunctionData("balanceOf(address)", address)
+	if err != nil {
+		return nil, nil, fmt.Errorf("build token call: %w", err)
+	}
+
+	nativeCallData, err := ethlib.BuildETHFunctionData("getEthBalance(address)", address)
+	if err != nil {
+		return nil, nil, fmt.Errorf("build native call: %w", err)
+	}
+
+	results, err := b.Client.Multicall(ctx, []ethlib.MulticallRequest{
+		{Target: token, CallData: tokenCallData},
+		{Target: b.MulticallAddress, CallData: nativeCallData},
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("multicall: %w", err)
+	}
+
+	if !results[0].Success {
+		return nil, nil, fmt.Errorf("token balance call failed")
+	}
+	if !results[1].Success {
+		return nil, nil, fmt.Errorf("native balance call failed")
+	}
+
+	tokenBalance = new(big.Int).SetBytes(results[0].ReturnData[len(results[0].ReturnData)-32:])
+	nativeBalance = new(big.Int).SetBytes(results[1].ReturnData[len(results[1].ReturnData)-32:])
+
+	return tokenBalance, nativeBalance, nil
 }
