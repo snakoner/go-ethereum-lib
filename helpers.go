@@ -417,3 +417,7 @@ func float64ToRational(value float64) (*big.Int, *big.Int) {
 
 	return num, den
 }
+
+func IsZeroAddress(address string) bool {
+	return common.HexToAddress(address) == common.HexToAddress("0x0000000000000000000000000000000000000000")
+}
